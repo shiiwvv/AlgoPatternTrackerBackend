@@ -1,0 +1,16 @@
+# Dependency directories
+node_modules/
+
+# Environment variables (keep your API keys secret!)
+.env
+
+# NPM debug logs
+npm-debug.log*
+
+# Build directories (for when you use React/build tools)
+dist/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
