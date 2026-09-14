@@ -31,7 +31,10 @@ const accessAndRefreshTokenGeneration = async (userId) => {
     }
 };
 
+//Checked
 const handleUserSignUpReq = asyncHandler(async (req , res) => {
+    console.log("Running Signup");
+    console.log(req.body);
     const {username , firstName , secondName , email , password } = req.body;
 
     if(inputValidate([username , firstName , secondName , email , password])){
@@ -44,20 +47,30 @@ const handleUserSignUpReq = asyncHandler(async (req , res) => {
         $or : [{username} , {email}],
     });
 
-    if(existedUser){
-        throw new ApiError(409 , "Account with Email and UserName Already Exists")
+
+    if(existedUser.length !== 0){
+        throw new ApiError(409 , "Account with Email Or UserName Already Exists")
     }
 
-    const avatarLocalFilePath = req.file?.avatar;
+    console.log("req.file: " , req.file);
+
+    const avatarLocalFilePath = req.file?.path;
+    console.log(req.file?.path);
     if(!avatarLocalFilePath){
         throw new ApiError(500 , "File Upload Through Multer Failed");
     }
 
     const avatarUploadCloud = await uploadOnCloudinary(avatarLocalFilePath);
 
+    console.log("avatarUploadCloud: " , avatarUploadCloud);
+
     if(!avatarUploadCloud){
         throw new ApiError(500 , "Avatar Upload On Cloudinary Failed");
     }
+
+    console.log("username: " , username);
+    console.log("password: " , password);
+    console.log("email: " , email);
     
     const createUser = await User.create({
         username, 
@@ -76,7 +89,23 @@ const handleUserSignUpReq = asyncHandler(async (req , res) => {
         throw new ApiError(500 , "Failed To Create User Doc in DB");
     }
 
-    await agenda.now("send welcome email" , {to : email , subject : "Welcome to the codeZip.."});
+    const subject = 'Welcome to bruteForce.com — Your Account Is Ready 🚀';
+    const text = `
+    Hi, ${createUser.username}
+
+Welcome to BruteForce.com! 🎉
+
+Your account has been created successfully, and you're all set to start your journey of becoming a better problem solver.
+
+Whether you're practicing DSA, tracking your progress, or sharpening your algorithmic thinking, we're here to help you stay consistent and keep improving.
+
+Your account is now ready. Let the solving begin! 💻🔥
+
+Keep learning. Keep solving. Keep growing.
+
+Team BruteForce.com`;
+
+    await agenda.now("send welcome email" , {to : email , subject , text});
 
     return res
             .status(200)
@@ -87,6 +116,7 @@ const handleUserSignUpReq = asyncHandler(async (req , res) => {
         ));
 }); 
 
+//Checked
 const handleSignInReq = asyncHandler(async (req ,res) => {
     const {usernameOrEmail , password} = req.body;
 
@@ -96,24 +126,26 @@ const handleSignInReq = asyncHandler(async (req ,res) => {
         throw new ApiError(400 , "username and password Required");
     }
 
-    const user = User.find({
-        $or : [{username : usernameOrEmail , email : usernameOrEmail}],
+    const user = await User.find({
+        $or : [{username : usernameOrEmail }, {email : usernameOrEmail}],
     });
 
     if(!user){
         throw new ApiError(400 , "No Such User Found in the database");
     }
 
-    const passwordValidate = await user.passwordValidation(password);
+    console.log("user: " , user);
+
+    const passwordValidate = await user[0].passwordValidation(password);
 
     if(!passwordValidate){
         throw new ApiError(400 , "Incorrect Password");
     }
 
-    const {accessToken , refreshToken} = await accessAndRefreshTokenGeneration(user._id);
+    const {accessToken , refreshToken} = await accessAndRefreshTokenGeneration(user[0]._id);
     
     const loggedInUser = await User
-                                .findById(user._id)
+                                .findById(user[0]._id)
                                 .select("-refreshToken -password");
 
     // const options = {
@@ -134,9 +166,12 @@ const handleSignInReq = asyncHandler(async (req ,res) => {
         ));
 });
 
+//Checked
 const handleSignOutReq = asyncHandler(async (req ,res) => {
     const userId = req.user?._id;
-    if(isValidObjectId(req.user?._id)){
+    console.log("req.user: " , req.user);
+
+    if(!isValidObjectId(userId)){
         throw new ApiError(400 , "Invalid UserId");
     }
 
@@ -152,11 +187,6 @@ const handleSignOutReq = asyncHandler(async (req ,res) => {
         }
     );
 
-    // const options = {
-    //     httpOnly : true,
-    //     secure : true,
-    // };
-
     return res.status(200)
         .clearCookie('accessToken' , cookieOptions) 
         .clearCookie('refreshToken' , cookieOptions) 
@@ -168,6 +198,10 @@ const handleSignOutReq = asyncHandler(async (req ,res) => {
         ));
 });
 
+//Handle Peramenet Account Delete..
+// const handleDeleteAccount
+
+//Checked
 const handleAccountUpdateReq = asyncHandler(async (req  , res) => {
     const {username , firstName , secondName} = req.body;
 
@@ -209,6 +243,7 @@ const handleAccountUpdateReq = asyncHandler(async (req  , res) => {
 
 });
 
+//Checked
 const handleChangeEmailReq = asyncHandler (async (req , res) => {
     if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid UserId");
@@ -234,6 +269,8 @@ const handleChangeEmailReq = asyncHandler (async (req , res) => {
         throw new ApiError(500 , "Failed to update email");
     }
 
+    await agenda.now("change email" , {email});
+
     return res
             .status(200)
             .json(new ApiResponse(
@@ -243,6 +280,7 @@ const handleChangeEmailReq = asyncHandler (async (req , res) => {
         ));
 });
 
+//Checked 
 const handleChangePasswordReq = asyncHandler (async (req , res) => {
     if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid UserId");
@@ -282,14 +320,16 @@ const handleChangePasswordReq = asyncHandler (async (req , res) => {
         ));
 });
 
+//Checked
 const handleAvatarUpdateReq = asyncHandler(async (req , res) => {
-    if(isValidObjectId(req.user?._id)){
+    const userId = req.user?._id;
+    if(!isValidObjectId(userId)){
         throw new ApiError(400 , "Invalid UserId");
     }
 
     console.log("req.file" , req.file);
 
-    const avatarLocalFilePath = req.file.avatar;
+    const avatarLocalFilePath = req.file?.path;
 
     if(!avatarLocalFilePath){
         throw new ApiError(400 , "Avatar File Not Found");
@@ -325,4 +365,34 @@ const handleAvatarUpdateReq = asyncHandler(async (req , res) => {
         ));
 });
 
-export {handleUserSignUpReq , handleSignInReq , handleSignOutReq , handleAccountUpdateReq , handleChangeEmailReq , handleChangePasswordReq , handleAvatarUpdateReq};
+//Checked
+const handleGetUserReq = asyncHandler(async (req , res) => {
+    if(!isValidObjectId(req.user?._id)){
+        throw new ApiError(400 , "Invalid userId");
+    }
+
+    const {username} = req.body;
+
+    if(inputValidate([username])){
+        throw new ApiError("No Username");
+    }
+
+    const user = await User.find({username});
+
+    console.log(user);
+
+    if(user.length === 0){
+        throw new ApiError(500 , `No user with username :  ${username} found`);
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            user[0],
+            `user with username :  ${username} found`
+        ));
+
+});
+
+export {handleUserSignUpReq , handleSignInReq , handleSignOutReq , handleAccountUpdateReq , handleChangeEmailReq , handleChangePasswordReq , handleAvatarUpdateReq , handleGetUserReq};

@@ -1,6 +1,6 @@
 import { validate } from "deep-email-validator";
-import { asyncHandler } from "./asyncHandler"; 
-import { ApiError } from "./apiError";
+import { asyncHandler } from "./asyncHandler.js"; 
+import { ApiError } from "./apiError.js";
 
 const validateEmail = asyncHandler(async (email) => {
     
@@ -13,7 +13,7 @@ const validateEmail = asyncHandler(async (email) => {
         validateSMTP: true,
     });
 
-    console.log(emailValidation);
+    console.log("emailValidation: " , emailValidation);
 
     const checkValidationSuccessful = 
         emailValidation.validators.regex.valid &&

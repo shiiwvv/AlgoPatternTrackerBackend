@@ -1,17 +1,14 @@
-export const allowValidInputs = (inputs) => {
-  const object = {};
-  
-  inputs.forEach((Obj) => {
-    const keys = Object.keys(Obj);
-    const prop = keys[0];
-    if (keys.length !== 0 && Obj[`${prop}`] && Obj[`${prop}`]?.trim() !== "") {
-      object[`${prop}`] = Obj[`${prop}`];
-    }
-  });
+export const allowValidInputs = (inputObj) => {
+  const cleanedData = {};
 
-  if(Object.keys(object).length === 0){
-    return null;
+  for (const [key, value] of Object.entries(inputObj)) {
+    if (value !== undefined && value !== null) {
+      
+      if (typeof value === "string" && value.trim() === "") continue;
+      
+      cleanedData[key] = value;
+    }
   }
 
-  return object;
+  return Object.keys(cleanedData).length === 0 ? null : cleanedData;
 };

@@ -23,6 +23,9 @@ const problemSchema = new Schema({
     notes: {
         type: String,
     },
+    link : {
+
+    },
     solved: {
         type: Boolean,
         required: true,
@@ -36,8 +39,14 @@ const problemSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: "User",
         required: true,
+    },
+    lastRemindedAt: { 
+        type: Date, 
+        default: null 
     }
 }, { timestamps: true });
+
+problemSchema.index({ solved: 1, reminderTime: 1, lastRemindedAt: 1, onwer: 1 });
  
 const Problem = mongoose.model("Problem", problemSchema);
 

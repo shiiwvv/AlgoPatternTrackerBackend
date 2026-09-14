@@ -5,8 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {inputValidate} from "../utils/inputValidation.js"
 import mongoose , {isValidObjectId} from "mongoose";
 import {allowValidInputs} from "../utils/validInputCheck.js";
-import {scheduleCustomReminder} from "../utils/scheduleCustomReminder.js";
-import {agenda} from "../../service/agenda.service.js"
+import {capitalizeInitialsInString} from "../utils/capitalizeInitialsInString.js"
 
 const handleUploadProblemReq = asyncHandler(async(req ,res) => {
     if(isValidObjectId(req.user?._id)){
@@ -20,6 +19,10 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
         throw new ApiError(400 , "Title , Platform , Topic , Difficulty, ISOString required");
     }
 
+    if(ISOString < new Date().toISOString()){
+        throw new ApiError("Can't set reminder for a previous date...");
+    }
+    
     const problemAlreadyExist = await Problem.find({title , platform , ownwer : userId});
 
     if(problemAlreadyExist){
@@ -32,6 +35,15 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
             ));
     }
 
+    const requiredTitle = title.trim().toLowerCase().split(" ").join("-");
+    const requiredPlatform = platform.trim().toLowerCase();
+
+    title         = capitalizeInitialsInString(title);
+    platform      = capitalizeInitialsInString(platform);
+    topic         = capitalizeInitialsInString(topic);
+    difficulty    = capitalizeInitialsInString(difficulty);
+
+
     const createProblem = await Problem.create({
         title,
         platform,
@@ -42,20 +54,12 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
         reminderTime : ISOString,
         solved : false,
         owner : userId,
+        link : `https://${requiredPlatform}.com/problems/${requiredTitle}/`,
     });
 
     if(!createProblem){
         throw new ApiError(500 , "Failed to Store the Problem in DB");
     }
-
-    const problemId = String(createProblem._id);
-
-    await scheduleCustomReminder(ISOString , userId , problemId);
-
-    const dateObj = new Date(ISOString);
-    dateObj.setDate(dateObj.getDate() + 1);
-
-    await agenda.schedule(dateObj.toISOString() , "check streak" , {userId , problemId});
 
     return res
             .status(200)
@@ -71,8 +75,6 @@ const handleUpdateLastDateReq = asyncHandler(async(req , res) => {
         throw new ApiError(400 , "Invalid userId");
     }
 
-    const userId = String(req.user?._id);
-
     const {ISOString} = req.body;
     const {problemId} = req.params;
 
@@ -80,32 +82,27 @@ const handleUpdateLastDateReq = asyncHandler(async(req , res) => {
         throw new ApiError(400 , "Invalid problemId");
     }
 
-    const problem = await Problem.findById(problemId);
-    if(!problem){
-        throw new ApiError(500 , "No problem with such problemId found");
-    }
-
     if(ISOString < new Date().toISOString()){
         throw new ApiError("Can't set reminder for a previous date...");
     }
 
-    problem.reminderTime = ISOString;
+    const problem = await Problem.findByIdAndUpdate(
+        problemId,
+        {
+            reminderTime : ISOString,
+        },
+        {returnDocument : 'after'}
+    );
 
-    await agenda.cancel({
-        name: "send reminder",
-        'data.userId' : userId,
-        'data.problemId' : problemId,
-    });
-
-    await scheduleCustomReminder(ISOString , userId , problemId);
-
-    await problem.save();
+    if(!problem){
+        throw new ApiError(500 , "Failed to update the ISOString");
+    }
 
     return res
             .status(200)
             .json(new ApiResponse(
                 200,
-                {},
+                problem,
                 "Successfully saved the new date",
         ));
 });
@@ -115,7 +112,7 @@ const handleMarkProblemReq = asyncHandler(async(req , res) => {
         throw new ApiError(400 , "Invalid UserId");
     }
 
-    const {problemId} = req.body;
+    const {problemId} = req.params;
     if(inputValidate([problemId])){
         throw new ApiError(400 , "Missing ProblemId");
     }
@@ -154,7 +151,13 @@ const handleUpdateProblem = asyncHandler(async (req , res) => {
     
     const {title , platform , topic , difficulty , time , notes} = req.body;
 
-    const updateObject = allowValidInputs([{title} , {platform} , {topic} , {difficulty} , {time} , {notes}]);
+    title      = capitalizeInitialsInString(title);
+    platform   = capitalizeInitialsInString(platform);
+    topic      = capitalizeInitialsInString(topic);
+    difficulty = capitalizeInitialsInString(difficulty);
+
+
+    const updateObject = allowValidInputs({title , platform , topic , difficulty , time , notes});
     if(!updateObject){
         const user = await Problem.findById(problemId);
         if(!user){
@@ -211,4 +214,50 @@ const handleDeleteProblem = asyncHandler(async (req , res) => {
         ));
 });
 
-export {handleUploadProblemReq , handleMarkProblemReq , handleUpdateProblem , handleUpdateLastDateReq , handleDeleteProblem}; 
+const handleGetAllProblemsReq = asyncHandler(async (req , res) => {
+    if(!isValidObjectId(req.user?._id)){
+        throw new ApiError(400 , "Invalid userId");
+    }
+    
+    const userId = String(req.user?._id);
+
+    const problems = await Problem.find({owner : userId});
+    
+    if(!problems){
+        throw new ApiError(500 , "No Problems Found, Log One To View");
+    }
+
+    return res  
+            .status(200)
+            .json(new ApiResponse(
+                200,
+                problems,
+                "SuccessFully Fetched all the user Problems"
+        ));
+}) 
+
+const handleGetParticularProblem = asyncHandler(async (req , res) => {
+    if(isValidObjectId(req.user?._id)){
+        throw new ApiError(400 , "Incorrect userId");
+    }
+
+    const {title} = req.body;
+
+    title = capitalizeInitialsInString(title);
+
+    const problem = await Problem.find({title});
+
+    if(!problem){
+        throw new ApiError(500 , "No Problem With Such Title Found");
+    }
+
+    return res
+            .status(200)
+            .json(new ApiResponse(
+                200,
+                problem,
+                `Problem with title ${title} found`,
+            ));
+});
+
+export {handleUploadProblemReq , handleMarkProblemReq , handleUpdateProblem , handleUpdateLastDateReq , handleDeleteProblem , handleGetAllProblemsReq , handleGetParticularProblem}; 
