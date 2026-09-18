@@ -34,11 +34,13 @@ const initAgenda = async (mongooseConnection) => {
     agenda.define("send reminder" , async(job) => {
         //Send Email Functionality
         try{
+            console.log("Sending Email");
             const startOfDay = new Date();
             startOfDay.setHours(0 , 0 , 0 , 0);
             const endOfDay = new Date();
             endOfDay.setHours(23 , 59 , 59 , 999);
 
+            console.log("Check Flag One");
             const problems = await Problem.aggregate([
                 {
                     $match : {
@@ -79,6 +81,7 @@ const initAgenda = async (mongooseConnection) => {
                 }
             ]).cursor();
 
+            console.log("Check Flag two");
             let BATCH_SIZE = 50;
             let currentBatch = [];
 
@@ -90,9 +93,12 @@ const initAgenda = async (mongooseConnection) => {
 
                 if(currentBatch.length === BATCH_SIZE){
                     const {successfullUserIds , failedUsers} = await sendCurrentBatchMail(currentBatch);
+                    
+                    console.log("successfullUserIds (job): " , successfullUserIds);
+                    console.log("failedUsers : (job): " , failedUsers);
 
                     await markLastReminderDate(successfullUserIds , startOfDay , endOfDay);
-
+                    console.log("markLastReminderDate Done");
                     failedRequests.push(...failedUsers);
                     currentBatch = [];
 
@@ -100,20 +106,34 @@ const initAgenda = async (mongooseConnection) => {
                 }
             }
 
+            console.log("Check Flag three");
             if(currentBatch.length > 0){
-                const {successfullUserIds , failedMails} = await sendCurrentBatchMail(currentBatch);
+                console.log("Check Inside three");
+                
+                const {successfullUserIds , failedUsers} = await sendCurrentBatchMail(currentBatch);
+                console.log("successfullUserIds (job): " , successfullUserIds);
+                console.log("failedUsers : (job): " , failedUsers);
+
                 await markLastReminderDate(successfullUserIds , startOfDay , endOfDay);
-                failedRequests.push(...failedMails);
+                failedRequests.push(...failedUsers);
             }
 
+            console.log("Check Flag Four");
             if(failedRequests.length > 0){
-                console.log(`Job finished, but ${allFailedUsers.length} emails failed to send.`);
-                throw new Error(`${allFailedUsers.length} emails failed`);
+                console.log("Check inside Four");
+                console.log(`Job finished, but ${failedRequests.length} emails failed to send.`);
+                throw new Error(`${failedRequests.length} emails failed`);
             }
 
+            console.log("job.attrs.data: " , job.attrs.data);
+            if (!job.attrs.data) job.attrs.data = {};
             job.attrs.data.retryCount = 0;
+
+            console.log("Check Flag Five");
         }
         catch(err){
+            console.log("Sending Email Failed");
+            if (!job.attrs.data) job.attrs.data = {};
             let retries = job.attrs.data.retryCount;
             retries += 1;
             job.attrs.data.retryCount = retries;
@@ -213,7 +233,12 @@ Team bruteForce.com
     await agenda.start();
     console.log("agenda worker started successfully");
 
-    await agenda.every('0 0 * * *' , "send reminder");
+    // await agenda.every('0 0 * * *' , "send reminder");
+    await agenda.every('30 0 * * *', 'send reminder', null, { 
+        timezone: 'Asia/Kolkata' 
+    });
+
+    
 };
 
 export {agenda , initAgenda};

@@ -24,7 +24,8 @@ const problemSchema = new Schema({
         type: String,
     },
     link : {
-
+        type : String,
+        required : true,
     },
     solved: {
         type: Boolean,
@@ -47,6 +48,17 @@ const problemSchema = new Schema({
 }, { timestamps: true });
 
 problemSchema.index({ solved: 1, reminderTime: 1, lastRemindedAt: 1, onwer: 1 });
+
+problemSchema.pre("save" , async function(){
+
+    if(this.isModified("title") || this.isModified("platform")){
+        
+        const requiredTitle = this.title.trim().toLowerCase().split(" ").join("-");
+        const requiredPlatform = this.platform.trim().toLowerCase();
+        
+        this.link = `https://${requiredPlatform}.com/problems/${requiredTitle}/`;
+    }
+});
  
 const Problem = mongoose.model("Problem", problemSchema);
 

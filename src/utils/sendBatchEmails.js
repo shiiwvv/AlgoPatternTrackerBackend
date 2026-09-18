@@ -3,6 +3,7 @@ import {customSubjects , customMessages} from "../constants.js";
 
 export const sendCurrentBatchMail = async (currentBatch) => {
     try {
+        console.log("sendCurrentbatch running");
         const emailPromises = currentBatch.map((user) => {
             const messages = customMessages(user.totalCount);
             const subjects = customSubjects(user.totalCount);
@@ -19,6 +20,8 @@ export const sendCurrentBatchMail = async (currentBatch) => {
         
         const response = await Promise.allSettled(emailPromises);
         
+        console.log("sendCurrentbatch response : " , response);
+
         let failedUsers = [];
         let successfullUserIds = [];
         response.forEach((user , index) => {
@@ -32,9 +35,11 @@ export const sendCurrentBatchMail = async (currentBatch) => {
         })
         
         console.log("Response(promise.all): " , response);
-
+        console.log("successfullUserIds : " , successfullUserIds);
+        console.log("failedUsers : " , failedUsers);
         return {successfullUserIds , failedUsers};
     } catch (error) {
+        console.log("sendCurrentbatch failed");
         throw error;
     }
 }

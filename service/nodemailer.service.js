@@ -26,7 +26,7 @@ let mailOptions = {
 
   let info = await transporter.sendMail(mailOptions);``
   
-  console.log("Message sent: %s", info.messageId);
+  console.log("Message sent: %s", info);
 
   return info;
 }

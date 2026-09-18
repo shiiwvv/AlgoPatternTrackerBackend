@@ -8,7 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "app": "node app.js",
     "index": "node index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "push" : "git push origin main"
   },
   "author": "",
   "license": "ISC",

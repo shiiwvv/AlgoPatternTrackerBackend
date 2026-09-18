@@ -16,7 +16,7 @@ import {problemRouter} from "../src/routes/problems.routes.js";
 import {globalErrorHandler} from "../src/middlewares/error.middleware.js"
  
 app.use('/api/v1/user' , userRouter);
-app.use('/api/v1/problem/' , problemRouter)
+app.use('/api/v1/problem' , problemRouter)
 
 app.use(globalErrorHandler); 
 

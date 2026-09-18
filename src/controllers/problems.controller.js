@@ -5,27 +5,36 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {inputValidate} from "../utils/inputValidation.js"
 import mongoose , {isValidObjectId} from "mongoose";
 import {allowValidInputs} from "../utils/validInputCheck.js";
-import {capitalizeInitialsInString} from "../utils/capitalizeInitialsInString.js"
+import {capitalizeInitialsInString} from "../utils/capitalizeInitialsInString.js";
+import {isValidISOString} from "../utils/checkISOString.js"
 
-const handleUploadProblemReq = asyncHandler(async(req ,res) => {
-    if(isValidObjectId(req.user?._id)){
+//Checked
+const handleUploadProblemReq = asyncHandler(async(req ,res) => { 
+    const userId = String(req.user?._id);
+    if(!isValidObjectId(userId)){
         throw new ApiError(400 , "Invalid UserId");
     }
-    const userId = String(req.user?._id);
 
-    const {title , platform , topic , difficulty , time , notes , ISOString} = req.body;
+    let {title , platform , topic , difficulty , time , notes , ISOString} = req.body;
 
     if(inputValidate([title , platform , topic , difficulty , ISOString])){
         throw new ApiError(400 , "Title , Platform , Topic , Difficulty, ISOString required");
     }
 
-    if(ISOString < new Date().toISOString()){
-        throw new ApiError("Can't set reminder for a previous date...");
+    if(!isValidISOString(ISOString)){
+        throw new ApiError(400 , "Invalid ISOString");
     }
-    
+
+    const userDate = ISOString.split("T"); 
+    const serverDate = new Date().toISOString().split("T");
+
+    if(userDate[0] < serverDate[0]){
+        throw new ApiError(400 , "Can't set reminder for a previous date...");
+    }
+
     const problemAlreadyExist = await Problem.find({title , platform , ownwer : userId});
 
-    if(problemAlreadyExist){
+    if(problemAlreadyExist.length !== 0){
         return res
                 .status(200)
                 .json(new ApiResponse(
@@ -34,9 +43,6 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
                     "Problem Alreadyy Existed",
             ));
     }
-
-    const requiredTitle = title.trim().toLowerCase().split(" ").join("-");
-    const requiredPlatform = platform.trim().toLowerCase();
 
     title         = capitalizeInitialsInString(title);
     platform      = capitalizeInitialsInString(platform);
@@ -54,7 +60,7 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
         reminderTime : ISOString,
         solved : false,
         owner : userId,
-        link : `https://${requiredPlatform}.com/problems/${requiredTitle}/`,
+        link : " ",
     });
 
     if(!createProblem){
@@ -70,6 +76,7 @@ const handleUploadProblemReq = asyncHandler(async(req ,res) => {
         ));
 });
  
+//Checked
 const handleUpdateLastDateReq = asyncHandler(async(req , res) => {
     if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid userId");
@@ -82,8 +89,11 @@ const handleUpdateLastDateReq = asyncHandler(async(req , res) => {
         throw new ApiError(400 , "Invalid problemId");
     }
 
-    if(ISOString < new Date().toISOString()){
-        throw new ApiError("Can't set reminder for a previous date...");
+    const userDate = ISOString.split("T"); 
+    const serverDate = new Date().toISOString().split("T");
+
+    if(userDate[0] < serverDate[0]){
+        throw new ApiError(400 , "Can't set reminder for a previous date...");
     }
 
     const problem = await Problem.findByIdAndUpdate(
@@ -107,8 +117,9 @@ const handleUpdateLastDateReq = asyncHandler(async(req , res) => {
         ));
 });
 
+//Checked
 const handleMarkProblemReq = asyncHandler(async(req , res) => {
-    if(isValidObjectId(req.user?._id)){
+    if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid UserId");
     }
 
@@ -118,7 +129,7 @@ const handleMarkProblemReq = asyncHandler(async(req , res) => {
     }
     if(!isValidObjectId(problemId)){
         throw new ApiError(400 , "Invalid problemId");
-    }
+    } 
 
     const problem = await Problem.findById(problemId);
 
@@ -139,67 +150,68 @@ const handleMarkProblemReq = asyncHandler(async(req , res) => {
         ));
 }); 
 
+//Checked
 const handleUpdateProblem = asyncHandler(async (req , res) => {
-    const {problemId} = req.query;
+    const {problemId} = req.params;
     
-    if(isValidObjectId(req.user?._id)){
+    if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid UserId");
     }
-    if(isValidObjectId(problemId)){
+    if(!isValidObjectId(problemId)){
         throw new ApiError(400 , "Invalid problemId");
     }
     
-    const {title , platform , topic , difficulty , time , notes} = req.body;
+    let {title , platform , topic , difficulty , time , notes} = req.body;
 
-    title      = capitalizeInitialsInString(title);
-    platform   = capitalizeInitialsInString(platform);
-    topic      = capitalizeInitialsInString(topic);
-    difficulty = capitalizeInitialsInString(difficulty);
+    title      = title ? capitalizeInitialsInString(title) : null;
+    platform   = platform ? capitalizeInitialsInString(platform) : null;
+    topic      = topic ? capitalizeInitialsInString(topic) : null;
+    difficulty = difficulty ? capitalizeInitialsInString(difficulty) : null;
 
-
-    const updateObject = allowValidInputs({title , platform , topic , difficulty , time , notes});
-    if(!updateObject){
-        const user = await Problem.findById(problemId);
-        if(!user){
-            throw new ApiError(500 , "Failed to Fetch the user object");
-        }
-
-        return res
-                .status(200)
-                .json(new ApiResponse(
-                    200,
-                    user,
-                    "Nothing to change.. User returned successfully",
-            ));
-    }
-
-    const updatedProblem = await Problem.findByIdAndUpdate(      
-        problemId,
-        updateObject,
-        {returnDocument : "after"},
-    );
-
-    if(!updatedProblem){
+    const user = await Problem.findById(problemId);
+    if(!user){
         throw new ApiError(500 , "Failed to Fetch the user object");
     }
+
+    if(title){
+        user.title = title;
+    }
+    if(platform){
+        user.platform = platform;
+    }
+    if(topic){
+        user.topic = topic;
+    }
+    if(difficulty){
+        user.difficulty = difficulty;
+    }
+    if(time){
+        user.time = time;
+    }
+    if(notes){
+        user.notes = notes;
+    }
+
+    await user.save();
 
     return res
             .status(200)
             .json(new ApiResponse(
                 200,
-                updatedProblem,
+                user,
                 "Successfully changed problemId",
         ));
 });
 
+//Checked
 const handleDeleteProblem = asyncHandler(async (req , res) => {
-    if(isValidObjectId(req.user?._id)){
+    if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid userId");
     }
     
     const {problemId} = req.params;
 
-    if(isValidObjectId(req.user?._id)){
+    if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid problemId");
     }
 
@@ -214,6 +226,7 @@ const handleDeleteProblem = asyncHandler(async (req , res) => {
         ));
 });
 
+//Checked
 const handleGetAllProblemsReq = asyncHandler(async (req , res) => {
     if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Invalid userId");
@@ -221,9 +234,10 @@ const handleGetAllProblemsReq = asyncHandler(async (req , res) => {
     
     const userId = String(req.user?._id);
 
-    const problems = await Problem.find({owner : userId});
+    const problems = await Problem.find({owner : userId}).select("-reminderTime -owner -lastRemindedAt");
+    console.log(problems);
     
-    if(!problems){
+    if(problems.length === 0){
         throw new ApiError(500 , "No Problems Found, Log One To View");
     }
 
@@ -236,12 +250,13 @@ const handleGetAllProblemsReq = asyncHandler(async (req , res) => {
         ));
 }) 
 
+//Checked
 const handleGetParticularProblem = asyncHandler(async (req , res) => {
-    if(isValidObjectId(req.user?._id)){
+    if(!isValidObjectId(req.user?._id)){
         throw new ApiError(400 , "Incorrect userId");
     }
 
-    const {title} = req.body;
+    let {title} = req.body;
 
     title = capitalizeInitialsInString(title);
 

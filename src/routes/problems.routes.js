@@ -13,23 +13,23 @@ problemRouter
     .get(handleGetAllProblemsReq);
 
 problemRouter
-    .route('/problem')
+    .route('/get-problem')
     .get(handleGetParticularProblem);
 
 problemRouter
-    .route('update/:problemId')
+    .route('/update/:problemId')
     .patch(handleUpdateProblem);
 
 problemRouter
-    .route('update/reminder/:problemId')
+    .route('/update/reminder/:problemId')
     .patch(handleUpdateLastDateReq);
 
 problemRouter
-    .route('update/mark/:problemId')
+    .route('/update/mark/:problemId')
     .patch(handleMarkProblemReq);
 
 problemRouter
-    .route('delete/:problemId')
+    .route('/delete/:problemId')
     .delete(handleDeleteProblem);
 
 export {problemRouter};
